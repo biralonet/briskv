@@ -15,4 +15,3 @@ module Clock (
    assign clk = counter[BITS];
    assign reset = RESET;
 endmodule
-	      

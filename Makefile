@@ -9,6 +9,9 @@ TOP_MODULE = top
 
 .DEFAULT_GOAL := test
 
+flash: build
+	openFPGALoader -b tangnano20k briskv.fs
+
 build: briskv.fs
 
 test: briskv
@@ -17,22 +20,16 @@ test: briskv
 briskv: test.v briskv.v soc.v
 	iverilog -DBENCH -DBOARD_FREQ=10 test.v briskv.v -o briskv
 
-flash: build
-	openFPGALoader -b tangnano20k briskv.fs
-
-clean:
-	rm -f briskv.json pnrbriskv.json briskv.fs briskv
-
 briskv.json: briskv.v soc.v clock.v
-	@echo "Synthesizing with yosys..."
 	$(YOSYS) -p "read_verilog $<; synth_gowin -top $(TOP_MODULE) -json $@"
 
 pnrbriskv.json: briskv.json $(CONSTRAINT_FILE)
-	@echo "Place and Route with nextpnr..."
 	$(NEXTPNR) --json $< --write $@ --device $(DEVICE) --vopt family=$(FAMILY) --vopt cst=$(CONSTRAINT_FILE)
 
 briskv.fs: pnrbriskv.json
-	@echo "Packing bitstream with gowin_pack..."
 	$(GOWIN_PACK) -d $(FAMILY) -o $@ $<
+
+clean:
+	rm -f briskv.json pnrbriskv.json briskv.fs briskv hello.o hello.bin
 
 .PHONY: test build flash clean

@@ -23,9 +23,10 @@ module Briskv (
 	    .clk(clk),
 	    .reset(reset));
 
+   // Setup memory and initial registers
    reg [31:0]		 instr;
    reg [31:0]		 pc;
-   reg [31:0]		 mem [0:10];
+   reg [31:0]		 mem [0:8];
    initial begin
       pc = 0;
       // NOP: add x0, x0, x0
@@ -47,16 +48,11 @@ module Briskv (
       // addi x1, x1, 1
       //           imm[11:0]    rs1       rd
       mem[4] = 32'b00000000001_00001_000_00001_0010011;
-      // lw x2, 0(x1)
-      //           imm[11:0]    rs1       rd
-      mem[5] = 32'b00000000000_00001_010_00010_0000011;
-      // sw x2, 0(x1)
-      //        imm[11:5]  rs2   rs1    imm[4:0]
-      mem[6] = 32'b000000_00010_00001_010_00000_0100011;
       // ebreak
-      mem[7] = 32'b00000000001_00000_000_00000_1110011;
-   end // initial begin
+      mem[5] = 32'b00000000001_00000_000_00000_1110011;
+   end
 
+   // Decode instruction
    wire is_lui     = (instr[6:0] == 7'b0110111);
    wire is_auipc   = (instr[6:0] == 7'b0010111);
    wire	is_jal     = (instr[6:0] == 7'b1101111);
@@ -69,9 +65,9 @@ module Briskv (
    wire is_fence   = (instr[6:0] == 7'b0001111);
    wire is_system  = (instr[6:0] == 7'b1110011);
 
-   wire [4:0] rs1 = instr[19:15];
-   wire [4:0] rs2 = instr[24:20];
-   wire [4:0] rd  = instr[11:7];
+   wire [4:0] rs1_id = instr[19:15];
+   wire [4:0] rs2_id = instr[24:20];
+   wire [4:0] rd_id  = instr[11:7];
 
    wire [2:0] alu_sel      = instr[14:12];
    wire	      alu_sel_2    = instr[30];
@@ -83,27 +79,68 @@ module Briskv (
    wire [31:0] u_imm = {instr[31], instr[30:12], {12{1'b0}}};
    wire [31:0] j_imm = {{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0};
 
+   // Registers
+   reg [31:0]		 regs[0:31];
+   reg [31:0]		 rs1;
+   reg [31:0]		 rs2;
+   wire [31:0]		 write_back_data;
+   wire			 write_back_en;
+   assign write_back_data = 0;
+   assign write_back_en = 0;
+
+`ifdef BENCH
+   integer		 i;
+   initial begin
+      for (i = 0; i < 32; ++i) begin
+	 regs[i] = 0;
+      end
+   end
+`endif
+
+   localparam FETCH_INSTR = 0;
+   localparam FETCH_REGS  = 1;
+   localparam EXECUTE = 2;
+   reg [1:0]  state = FETCH_INSTR;
    always @(posedge clk) begin
       if (reset) begin
 	 pc <= 0;
-	 // NOP: add x0, x0, x0
-	 //                   rs2   rs1       rd
-	 instr = 32'b0000000_00000_00000_000_00000_0110011;
-      end else if (!is_system) begin
-	 instr <= mem[pc];
-	 pc <= pc + 1;
-      end
+	 state <= FETCH_INSTR;
+	 instr <= 32'b0000000_00000_00000_000_00000_0110011;
+      end else begin
+	 if (write_back_en && rd_id != 0) begin
+	    regs[rd_id] <= write_back_data;
+	 end
+
+	 case (state)
+	   FETCH_INSTR: begin
+	      instr <= mem[pc];
+	      state <= FETCH_REGS;
+	   end
+	   FETCH_REGS: begin
+	      rs1 <= regs[rs1_id];
+	      rs2 <= regs[rs2_id];
+	      state <= EXECUTE;
+	   end
+	   EXECUTE: begin
+	      if (!is_system) begin
+		 pc <= pc + 1;
+	      end
+	      state <= FETCH_INSTR;
+
 `ifdef BENCH
-      if (is_system) $finish();
+	      if (is_system) $finish();
 `endif
+	   end
+	 endcase
+      end
    end
 
 `ifdef BENCH
-   assign LEDS = (is_system) ? 63 : {pc[0], is_alu_reg, is_alu_imm, is_store, is_load};
+   assign LEDS = is_system ? 63 : (1 << state);
 `else
-   assign LEDS = ~((is_system) ? 63 : {pc[0], is_alu_reg, is_alu_imm, is_store, is_load});
+   assign LEDS = is_system ? ~63 : ~(1 << state);
 `endif
-   assign TXD = 1'b0;
+
 
 `ifdef BENCH
    always @(posedge clk) begin
@@ -116,13 +153,15 @@ module Briskv (
 	is_branch:  $display("branch");
 	is_load:    $display("load");
 	is_store:   $display("store");
-	is_alu_imm: $display("alu_imm rd=%d rs1=%d rs2=%d imm=%0d", rd, rs1, i_imm, alu_sel);
-	is_alu_reg: $display("alu_reg rd=%d rs1=%d rs2=%d alu_sel=%b", rd, rs1, rs2, alu_sel);
+	is_alu_imm: $display("alu_imm rd_id=%d rs1_id=%d imm=%d alu_sel=%0d", rd_id, rs1_id, i_imm, alu_sel);
+	is_alu_reg: $display("alu_reg rd_id=%d rs1_id=%d rs2_id=%d alu_sel=%b", rd_id, rs1_id, rs2_id, alu_sel);
 	is_fence:   $display("fence");
 	is_system:  $display("system");
       endcase // case (1'b1)
       $display("");
    end
 `endif
+
+   assign TXD = 1'b0;
 
 endmodule

@@ -11,7 +11,10 @@ TOP_MODULE = top
 
 build: briskv.fs
 
-test: test.v briskv.v
+test: briskv
+	vvp briskv
+
+briskv: test.v briskv.v soc.v
 	iverilog -DBENCH -DBOARD_FREQ=10 test.v briskv.v -o briskv
 
 flash: build

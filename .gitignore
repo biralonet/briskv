@@ -1,3 +1,6 @@
 *.json
 *.fs
+*.o
+*.mem
+*.bin
 briskv

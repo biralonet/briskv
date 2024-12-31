@@ -11,7 +11,7 @@ module Briskv (
    wire			 clk;
    wire			 reset;
 
-   reg [4:0]		 leds;
+   reg [5:0]		 leds;
 `ifdef BENCH
    assign LEDS = leds;
 `else
@@ -33,48 +33,11 @@ module Briskv (
    // Setup memory and initial registers
    reg [31:0]		 instr;
    reg [31:0]		 pc;
-   reg [31:0]		 mem [0:11];
+   reg [31:0]		 mem [0:12];
    initial begin
       pc = 0;
-      // NOP: add x0, x0, x0
-      //                   rs2   rs1       rd
       instr = 32'b0000000_00000_00000_000_00000_0110011;
-      //
-      // add x1, x0, x0
-      //                    rs2   rs1       rd
-      mem[0] = 32'b0000000_00000_00000_000_00001_0110011;
-      // addi x1, x1, 1
-      //           imm[11:0]    rs1       rd
-      mem[1] = 32'b00000000001_00001_000_00001_0010011;
-      // addi x1, x1, 1
-      //           imm[11:0]   rs1       rd
-      mem[2] = 32'b00000000001_00001_000_00001_0010011;
-      // addi x1, x1, 1
-      //           imm[11:0]    rs1       rd
-      mem[3] = 32'b00000000001_00001_000_00001_0010011;
-      // addi x1, x1, 1
-      //           imm[11:0]    rs1       rd
-      mem[4] = 32'b00000000001_00001_000_00001_0010011;
-      // add x2, x1, x0
-      //                    rs2   rs1       rd
-      mem[5] = 32'b0000000_00000_00001_000_00010_0110011;
-      // add x3, x1, x2
-      //                    rs2   rs1       rd
-      mem[6] = 32'b0000000_00010_00001_000_00011_0110011;
-      // srli x3, x3, 3
-      //                   shamt  rs1       rd
-      mem[7] = 32'b0000000_00011_00011_101_00011_0010011;
-      // slli x3, x3, 31
-      //                   shamt  rs1       rd
-      mem[8] = 32'b0000000_11111_00011_001_00011_0010011;
-      // srai x3, x3, 5
-      //                   shamt  rs1       rd
-      mem[9] = 32'b0100000_00101_00011_101_00011_0010011;
-      // srli x1, x3, 26
-      //                   shamt  rs1       rd
-      mem[10] = 32'b0000000_11010_00011_101_00011_0010011;
-      // ebreak
-      mem[11] = 32'b00000000001_00000_000_00000_1110011;
+      $readmemh("instructions.mem", mem);
    end
 
    // Decode instruction
@@ -162,7 +125,7 @@ module Briskv (
 
 	 case (state)
 	   FETCH_INSTR: begin
-	      instr <= mem[pc];
+	      instr <= mem[pc[31:2]];
 	      state <= FETCH_REGS;
 	   end
 	   FETCH_REGS: begin
@@ -172,7 +135,7 @@ module Briskv (
 	   end
 	   EXECUTE: begin
 	      if (!is_system) begin
-		 pc <= pc + 1;
+		 pc <= pc + 4;
 	      end
 	      state <= FETCH_INSTR;
 

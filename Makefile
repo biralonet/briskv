@@ -5,6 +5,7 @@ GOWIN_PACK = gowin_pack
 OBJCOPY = riscv64-unknown-elf-objcopy
 OBJDUMP = riscv64-unknown-elf-objdump
 AS = riscv64-unknown-elf-as
+LD = riscv64-unknown-elf-ld
 
 DEVICE = GW2AR-LV18QN88C8/I7
 FAMILY = GW2A-18C
@@ -36,8 +37,11 @@ briskv.fs: pnrbriskv.json
 instructions.mem: hello.bin
 	xxd -e $< | cut -d' ' -f2-5 > $@
 
+dump-elf: hello
+	$(OBJDUMP) -x -d -M numeric -M no-aliases $<
+
 dump-obj: hello.o
-	$(OBJDUMP) -d -M numeric -M no-aliases $<
+	$(OBJDUMP) -x -d -M numeric -M no-aliases $<
 
 dump-bin: hello.bin
 	xxd $<
@@ -45,13 +49,16 @@ dump-bin: hello.bin
 dump-bin-dis: hello.bin
 	riscv64-unknown-elf-objdump -D -b binary -m riscv:rv32i -M numeric -M no-aliases $<
 
-hello.bin: hello.o
+hello.bin: hello
 	$(OBJCOPY) -O binary $< $@
+
+hello: hello.o
+	$(LD) -T linker.ld -m elf32lriscv -nostdlib hello.o -o hello
 
 hello.o: hello.s
 	$(AS) $< -march=rv32i -mabi=ilp32 -o $@
 
 clean:
-	rm -f briskv.json pnrbriskv.json briskv.fs briskv hello.o hello.bin instructions.mem
+	rm -f briskv.json pnrbriskv.json briskv.fs briskv hello.o hello hello.bin instructions.mem
 
 .PHONY: test build flash clean

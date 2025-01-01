@@ -20,9 +20,9 @@ module Briskv (
 
    Clock #(
 `ifdef BENCH
-	   .BITS(18)
+	   .BITS(16)
 `else
-	   .BITS(24)
+	   .BITS(22)
 `endif
    ) clock (
 	    .CLK(CLK),
@@ -33,7 +33,7 @@ module Briskv (
    // Setup memory and initial registers
    reg [31:0]		 instr;
    reg [31:0]		 pc;
-   reg [31:0]		 mem [0:3];
+   reg [31:0]		 mem [0:4];
    initial begin
       pc = 0;
       instr = 32'b0000000_00000_00000_000_00000_0110011;
@@ -45,7 +45,7 @@ module Briskv (
    wire is_auipc   = (instr[6:0] == 7'b0010111);
    wire	is_jal     = (instr[6:0] == 7'b1101111);
    wire	is_jalr    = (instr[6:0] == 7'b1100111);
-   wire	is_branch  = (instr[6:0] == 7'b1101111);
+   wire	is_branch  = (instr[6:0] == 7'b1100011);
    wire is_load    = (instr[6:0] == 7'b0000011);
    wire is_store   = (instr[6:0] == 7'b0100011);
    wire is_alu_imm = (instr[6:0] == 7'b0010011);
@@ -102,11 +102,25 @@ module Briskv (
    assign write_back_data = (is_jal || is_jalr) ? (pc + 4) : alu_out;
    assign write_back_en = state == EXECUTE && (is_alu_reg || is_alu_imm || is_jal || is_jalr);
 
+   reg			 take_branch;
+   always @(*) begin
+      case (funct3)
+	3'b000: take_branch = rs1 == rs2;
+	3'b001: take_branch = rs1 != rs2;
+	3'b100: take_branch = $signed(rs1) < $signed(rs2);
+	3'b101: take_branch = $signed(rs1) >= $signed(rs2);
+	3'b110: take_branch = rs1 < rs2;
+	3'b111: take_branch = rs1 >= rs2;
+	default: take_branch = 1'b0;
+      endcase
+   end
+
    localparam FETCH_INSTR = 0;
    localparam FETCH_REGS  = 1;
    localparam EXECUTE = 2;
    reg [1:0]  state = FETCH_INSTR;
    wire [31:0] next_pc =
+	       (is_branch && take_branch) ? pc + b_imm :
 	       is_jal ? pc + j_imm :
 	       is_jalr ? pc + rs1 + i_imm :
 	       pc + 4;

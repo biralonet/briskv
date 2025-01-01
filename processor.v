@@ -75,13 +75,12 @@ module Processor (
    assign write_back_data = (is_jal || is_jalr) ? pc + 4
 			    : is_lui            ? u_imm
 			    : is_auipc          ? pc + u_imm
+			    : is_load           ? load_data
 			    : alu_out;
-   assign write_back_en = state == EXECUTE && (is_alu_reg ||
-					       is_alu_imm ||
-					       is_jal     ||
-					       is_jalr    ||
-					       is_lui     ||
-					       is_auipc);
+   assign write_back_en =
+			 (state == EXECUTE &&
+			  !is_branch && !is_store && !is_load) ||
+			 (state == WAIT_DATA);
 
    reg			 take_branch;
    always @(*) begin
@@ -96,11 +95,30 @@ module Processor (
       endcase
    end
 
+   wire [31:0] loadstore_addr = rs1 + i_imm;
+   wire [15:0] load_halfword =
+	       loadstore_addr[1] ? mem_rdata[31:16] : mem_rdata[15:0];
+   wire [7:0] load_byte =
+	      loadstore_addr[0] ? load_halfword[15:8] : load_halfword[7:0];
+
+   wire	      mem_byte_access = funct3[1:0] == 2'b00;
+   wire	      mem_halfword_access = funct3[1:0] == 2'b01;
+
+   wire load_sign =
+	!funct3[2] & (mem_byte_access ? load_byte[7] : load_halfword[15]);
+   wire [31:0] load_data =
+	       mem_byte_access ? {{24{load_sign}}, load_byte} :
+	       mem_halfword_access ? {{16{load_sign}}, load_halfword} :
+	       mem_rdata;
+
    localparam FETCH_INSTR = 0;
-   localparam WAIT_INSTR = 1;
+   localparam WAIT_INSTR  = 1;
    localparam FETCH_REGS  = 2;
-   localparam EXECUTE = 3;
-   reg [1:0]  state = FETCH_INSTR;
+   localparam EXECUTE     = 3;
+   localparam LOAD        = 4;
+   localparam WAIT_DATA   = 5;
+
+   reg [2:0]  state = FETCH_INSTR;
    wire [31:0] next_pc =
 	       (is_branch && take_branch) ? pc + b_imm
 	       : is_jal                   ? pc + j_imm
@@ -138,18 +156,25 @@ module Processor (
 	      if (!is_system) begin
 		 pc <= next_pc;
 	      end
-	      state <= FETCH_INSTR;
+	      state <= is_load ? LOAD : FETCH_INSTR;
 
 `ifdef BENCH
 	      if (is_system) $finish();
 `endif
 	   end
+	   LOAD: begin
+	      state <= WAIT_DATA;
+	   end
+	   WAIT_DATA: begin
+	      state <= FETCH_INSTR;
+	   end
 	 endcase
       end
    end
 
-   assign mem_addr = pc;
-   assign mem_rstrb = state == FETCH_INSTR;
+   assign mem_addr = (state == WAIT_INSTR || state == FETCH_INSTR) ?
+		     pc : loadstore_addr;
+   assign mem_rstrb = state == FETCH_INSTR || state == LOAD;
 
 `ifdef BENCH
    always @(posedge clk) begin

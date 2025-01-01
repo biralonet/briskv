@@ -42,6 +42,9 @@ dump-obj: hello.o
 dump-bin: hello.bin
 	xxd $<
 
+dump-bin-dis: hello.bin
+	riscv64-unknown-elf-objdump -D -b binary -m riscv:rv32i -M numeric -M no-aliases $<
+
 hello.bin: hello.o
 	$(OBJCOPY) -O binary $< $@
 

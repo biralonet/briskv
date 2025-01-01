@@ -8,11 +8,10 @@ module top(
            output       TXD
 );
 
-   Briskv briskv(
-	    .CLK(CLK),
-	    .RESET(RESET),
-	    .LEDS(LEDS),
-	    .RXD(RXD),
-	    .TXD(TXD));
-   
+   Soc briskv(.CLK(CLK),
+	      .RESET(RESET),
+	      .LEDS(LEDS),
+	      .RXD(RXD),
+	      .TXD(TXD));
+
 endmodule

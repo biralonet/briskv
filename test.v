@@ -5,12 +5,11 @@ module Test();
    reg	      RXD = 1'b0;
    wire	      TXD;
 
-   Briskv briskv(
-	    .CLK(CLK),
-	    .RESET(RESET),
-	    .LEDS(LEDS),
-	    .RXD(RXD),
-	    .TXD(TXD));
+   Soc soc(.CLK(CLK),
+	   .RESET(RESET),
+	   .LEDS(LEDS),
+	   .RXD(RXD),
+	   .TXD(TXD));
 
    reg [6:0]  prev_LEDS = 0;
    initial begin

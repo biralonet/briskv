@@ -21,10 +21,10 @@ flash: briskv.fs
 test: briskv
 	vvp briskv
 
-briskv: test.v briskv.v soc.v instructions.mem
+briskv: test.v briskv.v soc.v memory.v processor.v clock.v instructions.mem
 	iverilog -DBENCH -DBOARD_FREQ=10 test.v briskv.v -o briskv
 
-briskv.json: briskv.v soc.v clock.v instructions.mem
+briskv.json: briskv.v soc.v memory.v processor.v clock.v instructions.mem
 	$(YOSYS) -p "read_verilog $<; synth_gowin -top $(TOP_MODULE) -json $@"
 
 pnrbriskv.json: briskv.json $(CONSTRAINT_FILE)

@@ -4,14 +4,6 @@ module Clock (
 	      output clk,
 	      output reset
 );
-
-   parameter	     BITS = 0;
-   reg [BITS:0]	     counter = 0;
-   
-   always @(posedge CLK) begin
-      counter <= counter + 1;
-   end
-
-   assign clk = counter[BITS];
+   assign clk = CLK;
    assign reset = RESET;
 endmodule

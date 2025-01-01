@@ -20,26 +20,23 @@ module Soc (
    wire [31:0]		 mem_addr;
    wire [31:0]		 mem_rdata;
    wire			 mem_rstrb;
-   wire [31:0]		 x1;
+   wire [31:0]		 x10;
    Processor processor(.clk(clk),
 		       .reset(reset),
 		       .mem_addr(mem_addr),
 		       .mem_rdata(mem_rdata),
 		       .mem_rstrb(mem_rstrb),
-		       .x1(x1));
+		       .x10(x10));
 `ifdef BENCH
-   assign LEDS = x1[5:0];
+   assign LEDS = x10[5:0];
 `else
-   assign LEDS = ~x1[5:0];
+   assign LEDS = ~x10[5:0];
 `endif
 
-   Clock #(
-	   .BITS(18)
-   ) clock (
-	    .CLK(CLK),
-	    .RESET(RESET),
-	    .clk(clk),
-	    .reset(reset));
+   Clock clock(.CLK(CLK),
+	       .RESET(RESET),
+	       .clk(clk),
+	       .reset(reset));
 
    assign TXD = 1'b0;
 

@@ -11,7 +11,7 @@ module Test();
 	   .RXD(RXD),
 	   .TXD(TXD));
 
-   reg [6:0]  prev_LEDS = 0;
+   reg [5:0]  prev_LEDS = 0;
    initial begin
       CLK = 0;
       forever begin

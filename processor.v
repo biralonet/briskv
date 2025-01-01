@@ -4,7 +4,7 @@ module Processor (
 	    output [31:0]     mem_addr,
 	    input [31:0]      mem_rdata,
 	    output	      mem_rstrb,
-	    output reg [31:0] x1	 
+	    output reg [31:0] x10	 
 );
    reg [31:0]		      pc = 0;
    reg [31:0]		      instr;
@@ -46,6 +46,7 @@ module Processor (
       for (i = 0; i < 32; ++i) begin
 	 regs[i] = 0;
       end
+      x10 = 0;
    end
 `endif
 
@@ -112,8 +113,8 @@ module Processor (
       end else begin
 	 if (write_back_en && rd_id != 0) begin
 	    regs[rd_id] <= write_back_data;
-	    if (rd_id == 1) begin
-	       x1 <= write_back_data;
+	    if (rd_id == 10) begin
+	       x10 <= write_back_data;
 	    end
 `ifdef BENCH
 	    $display("x%0d <= %b", rd_id, write_back_data);

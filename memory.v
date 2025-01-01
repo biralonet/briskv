@@ -5,7 +5,7 @@ module Memory (
 	       input		 mem_rstrb
 	       );
 
-   reg [31:0]			 mem [0:7];
+   reg [31:0]			 mem [0:9];
    initial begin
       $readmemh("instructions.mem", mem);
    end

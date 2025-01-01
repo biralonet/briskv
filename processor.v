@@ -52,10 +52,13 @@ module Processor (
    wire [31:0] alu_in1 = rs1;
    wire [31:0] alu_in2 = is_alu_reg ? rs2 : i_imm;
    wire [4:0]  shamt   = is_alu_reg ? rs2[4:0] : instr[24:20];
+
    reg [31:0]  alu_out;
    always @(*) begin
       case (funct3)
-	3'b000: alu_out = (funct7[5] & instr[5]) ? (alu_in1 - alu_in2) : (alu_in1 + alu_in2);
+	3'b000: alu_out = (funct7[5] & instr[5]) ?
+			  (alu_in1 - alu_in2) :
+			  (alu_in1 + alu_in2);
 	3'b001: alu_out = alu_in1 << shamt;
 	3'b010: alu_out = $signed(alu_in1) < $signed(alu_in2);
 	3'b011: alu_out = alu_in1 < alu_in2;
@@ -69,8 +72,8 @@ module Processor (
    wire [31:0]		 write_back_data;
    wire			 write_back_en;
    assign write_back_data = (is_jal || is_jalr) ? pc + 4
-			    : is_lui ? u_imm
-			    : is_auipc ? pc + u_imm
+			    : is_lui            ? u_imm
+			    : is_auipc          ? pc + u_imm
 			    : alu_out;
    assign write_back_en = state == EXECUTE && (is_alu_reg ||
 					       is_alu_imm ||
@@ -99,17 +102,19 @@ module Processor (
    reg [1:0]  state = FETCH_INSTR;
    wire [31:0] next_pc =
 	       (is_branch && take_branch) ? pc + b_imm
-	       : is_jal ? pc + j_imm
-	       : is_jalr ? pc + rs1 + i_imm
+	       : is_jal                   ? pc + j_imm
+	       : is_jalr                  ? rs1 + i_imm
 	       : pc + 4;
    always @(posedge clk) begin
       if (reset) begin
 	 pc <= 0;
 	 state <= FETCH_INSTR;
-	 instr <= 32'b0000000_00000_00000_000_00000_0110011;
       end else begin
 	 if (write_back_en && rd_id != 0) begin
 	    regs[rd_id] <= write_back_data;
+	    if (rd_id == 1) begin
+	       x1 <= write_back_data;
+	    end
 `ifdef BENCH
 	    $display("x%0d <= %b", rd_id, write_back_data);
 `endif
@@ -140,10 +145,10 @@ module Processor (
 	   end
 	 endcase
       end
-   end // always @ (posedge clk)
+   end
 
    assign mem_addr = pc;
-   assign mem_rstrb = (state == FETCH_INSTR);
+   assign mem_rstrb = state == FETCH_INSTR;
 
 `ifdef BENCH
    always @(posedge clk) begin

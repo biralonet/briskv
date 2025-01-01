@@ -27,14 +27,14 @@ module Soc (
 		       .mem_rdata(mem_rdata),
 		       .mem_rstrb(mem_rstrb),
 		       .x1(x1));
+`ifdef BENCH
    assign LEDS = x1[5:0];
+`else
+   assign LEDS = ~x1[5:0];
+`endif
 
    Clock #(
-`ifdef BENCH
 	   .BITS(18)
-`else
-	   .BITS(24)
-`endif
    ) clock (
 	    .CLK(CLK),
 	    .RESET(RESET),

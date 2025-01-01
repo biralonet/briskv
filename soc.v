@@ -33,7 +33,7 @@ module Briskv (
    // Setup memory and initial registers
    reg [31:0]		 instr;
    reg [31:0]		 pc;
-   reg [31:0]		 mem [0:4];
+   reg [31:0]		 mem [0:2];
    initial begin
       pc = 0;
       instr = 32'b0000000_00000_00000_000_00000_0110011;
@@ -99,8 +99,16 @@ module Briskv (
 
    wire [31:0]		 write_back_data;
    wire			 write_back_en;
-   assign write_back_data = (is_jal || is_jalr) ? (pc + 4) : alu_out;
-   assign write_back_en = state == EXECUTE && (is_alu_reg || is_alu_imm || is_jal || is_jalr);
+   assign write_back_data = (is_jal || is_jalr) ? pc + 4
+			    : is_lui ? u_imm
+			    : is_auipc ? pc + u_imm
+			    : alu_out;
+   assign write_back_en = state == EXECUTE && (is_alu_reg ||
+					       is_alu_imm ||
+					       is_jal     ||
+					       is_jalr    ||
+					       is_lui     ||
+					       is_auipc);
 
    reg			 take_branch;
    always @(*) begin
@@ -120,10 +128,10 @@ module Briskv (
    localparam EXECUTE = 2;
    reg [1:0]  state = FETCH_INSTR;
    wire [31:0] next_pc =
-	       (is_branch && take_branch) ? pc + b_imm :
-	       is_jal ? pc + j_imm :
-	       is_jalr ? pc + rs1 + i_imm :
-	       pc + 4;
+	       (is_branch && take_branch) ? pc + b_imm
+	       : is_jal ? pc + j_imm
+	       : is_jalr ? pc + rs1 + i_imm
+	       : pc + 4;
    always @(posedge clk) begin
       if (reset) begin
 	 pc <= 0;

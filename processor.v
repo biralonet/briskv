@@ -4,6 +4,8 @@ module Processor (
 	    output [31:0]     mem_addr,
 	    input [31:0]      mem_rdata,
 	    output	      mem_rstrb,
+	    output [31:0]     mem_wdata,
+	    output [3:0]      mem_wmask,
 	    output reg [31:0] x10	 
 );
    reg [31:0]		      pc = 0;
@@ -70,18 +72,6 @@ module Processor (
       endcase
    end
 
-   wire [31:0]		 write_back_data;
-   wire			 write_back_en;
-   assign write_back_data = (is_jal || is_jalr) ? pc + 4
-			    : is_lui            ? u_imm
-			    : is_auipc          ? pc + u_imm
-			    : is_load           ? load_data
-			    : alu_out;
-   assign write_back_en =
-			 (state == EXECUTE &&
-			  !is_branch && !is_store && !is_load) ||
-			 (state == WAIT_DATA);
-
    reg			 take_branch;
    always @(*) begin
       case (funct3)
@@ -95,7 +85,7 @@ module Processor (
       endcase
    end
 
-   wire [31:0] loadstore_addr = rs1 + i_imm;
+   wire [31:0] loadstore_addr = rs1 + (is_store ? s_imm : i_imm);
    wire [15:0] load_halfword =
 	       loadstore_addr[1] ? mem_rdata[31:16] : mem_rdata[15:0];
    wire [7:0] load_byte =
@@ -103,6 +93,21 @@ module Processor (
 
    wire	      mem_byte_access = funct3[1:0] == 2'b00;
    wire	      mem_halfword_access = funct3[1:0] == 2'b01;
+
+   assign mem_wdata[7:0] = rs2[7:0];
+   assign mem_wdata[15:8] = loadstore_addr[0] ? rs2[7:0] : rs2[15:8];
+   assign mem_wdata[23:16] = loadstore_addr[1] ? rs2[7:0] : rs2[23:16];
+   assign mem_wdata[31:24] = loadstore_addr[0] ? rs2[7:0] :
+			     loadstore_addr[1] ? rs2[15:8] : rs2[31:24];
+   wire [3:0] store_wmask =
+	      mem_byte_access ?
+	      (loadstore_addr[1] ?
+	       (loadstore_addr[0] ? 4'b1000 : 4'b0100) :
+	       (loadstore_addr[0] ? 4'b0010 : 5'b0001)
+	       ) :
+	      mem_halfword_access ?
+	      (loadstore_addr[1] ? 4'b1100 : 4'b0011) :
+	      4'b1111;
 
    wire load_sign =
 	!funct3[2] & (mem_byte_access ? load_byte[7] : load_halfword[15]);
@@ -117,6 +122,7 @@ module Processor (
    localparam EXECUTE     = 3;
    localparam LOAD        = 4;
    localparam WAIT_DATA   = 5;
+   localparam STORE       = 6;
 
    reg [2:0]  state = FETCH_INSTR;
    wire [31:0] next_pc =
@@ -156,7 +162,9 @@ module Processor (
 	      if (!is_system) begin
 		 pc <= next_pc;
 	      end
-	      state <= is_load ? LOAD : FETCH_INSTR;
+	      state <= is_load ? LOAD :
+		       is_store ? STORE :
+		       FETCH_INSTR;
 
 `ifdef BENCH
 	      if (is_system) $finish();
@@ -168,6 +176,9 @@ module Processor (
 	   WAIT_DATA: begin
 	      state <= FETCH_INSTR;
 	   end
+	   STORE: begin
+	      state <= FETCH_INSTR;
+	   end
 	 endcase
       end
    end
@@ -175,6 +186,19 @@ module Processor (
    assign mem_addr = (state == WAIT_INSTR || state == FETCH_INSTR) ?
 		     pc : loadstore_addr;
    assign mem_rstrb = state == FETCH_INSTR || state == LOAD;
+   assign mem_wmask = {4{(state == STORE)}} & store_wmask;
+
+   wire [31:0]		 write_back_data;
+   wire			 write_back_en;
+   assign write_back_data = (is_jal || is_jalr) ? pc + 4
+			    : is_lui            ? u_imm
+			    : is_auipc          ? pc + u_imm
+			    : is_load           ? load_data
+			    : alu_out;
+   assign write_back_en =
+			 (state == EXECUTE &&
+			  !is_branch && !is_store && !is_load) ||
+			 (state == WAIT_DATA);
 
 `ifdef BENCH
    always @(posedge clk) begin
